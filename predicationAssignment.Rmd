@@ -1,7 +1,7 @@
 ---
 title: "Prediction Assignment"
 author: "KKher"
-date: "8/29/2020"
+date: "8/30/2020"
 ---
 
 ```{r setup, include=FALSE}
@@ -35,83 +35,66 @@ First we need to clean up our dataset and only use column with data.
 - Remove unwanted columns
 - Handle NAs
 ```{r cleanup}
-# check number of NA per coulmn
-na_count <- colSums(is.na(train))
-table(na_count)
+# removing columns with NAs
+train <- train[, colSums(is.na(train)) == 0]
 
-# since we have almost 67 columns with empty values, we will drop those
-# first get their names
-na_cols <- names(na_count[na_count>0])
-train_noNA <- train[, !(names(train) %in% na_cols)]
+NZV <- nearZeroVar(train)
+train <- train[, -NZV]
 
-# also the first 7 columns are unneeded
-train_noNA <- train_noNA[,-c(1:7)]
-
-# do the same on test dataset
-na_count <- colSums(is.na(test))
-na_cols <- names(na_count[na_count>0])
-test_noNA <- test[, !(names(test) %in% na_cols)]
-test_noNA <- test_noNA[,-c(1:7)]
+# removing columns with unneeded data
+train <- train[, -c(1:7)]
 
 # examine our objective column
-plot_ly(x = train_noNA$classe, type = "histogram", histnorm = "probability") %>%
+plot_ly(x = train$classe, type = "histogram", histnorm = "probability") %>%
   layout(title = "Propotion of Classe variable in Train dataset",
          xaxis= list(title = "Classe"), yaxis= list(title = "Probability") )
 ```
 
 ## Prediction Technique
 
-I'll use combined predictors technique to get best results with least errors.
 Two main techniques will be Random Forest & MultiNomial modeling.
 
-- First Model: Tree Classification
+- First Model: Decision Tree Classification
 ``` {r algorithm1}
 library(rpart)
+library(rpart.plot)
+
 # create training, validation
-inTrain <- createDataPartition(train_noNA$classe, p = 0.70, list = FALSE)
-validation <- train_noNA[-inTrain, ]
-training <- train_noNA[inTrain, ]
+inTrain <- createDataPartition(train$classe, p = 0.7, list = FALSE)
+training <- train[inTrain, ]
+validation <- train[-inTrain, ]
+
+training$classe <- as.factor(training$classe)
+validation$classe <- as.factor(validation$classe)
 
 # build model & plot result
-mod1 <- rpart(classe ~ ., data = training, method = "class")
-rpart.plot(modelTree, main="Classification Tree", extra=102, under=TRUE, faclen=0)
+mod1 <- rpart(classe ~ ., data = training, method = "class",na.action = na.pass)
+rpart.plot(mod1, main="Model#1: Decision Tree")
 
 # use model#1 to calculate prediction
-pred1 <- predict(mod1, validation)
+pred1 <- predict(mod1, newdata=validation, type = "class")
+confusionTree <- confusionMatrix(pred1, validation$classe)
+confusionTree
 ```
 
 - Second Model: Random Forest
+Use number of trees = 50 with 5 main features per tree
+
 ```{r algorithm2}
-# build model & plot result
 library(randomForest)
-mod2<- randomForest(classe ~ ., training, ntree=100)
+
+# build model & plot result .. 
+mod2 <- randomForest(classe ~ ., data=training, ntree=50, mtry=5, importance=TRUE)
 plot(mod2, log="y")
+
 # use model#2 to calculate prediction
 pred2 <- predict(mod2, validation)
+confusionRF <- confusionMatrix(pred2, validation$classe)
+confusionRF
 ```
 
-- Plot output of two models
-```{r 2modelsPlot}
-qplot(pred1, pred2,colour=classe, data=validation)
-```
 
-- Combine Models above and check their errors
-```{r combineMethods}
-predDF <- data.frame(pred1, pred2, classe=validation$classe)
-combinedFit <- train(classe~., method="gam", data=predDF)
-combinedPred <- predict(combinedFit, predDF)
-
-# checking errors
-mod1_error <- sqrt(sum((pred1-validation$classe)^2))
-mod2_error <- sqrt(sum((pred2-validation$classe)^2))
-combinedMod_error <- sqrt(sum((combinedPred-validation$classe)^2))
-```
-
--- We get error from Tree classification model = ```mod1_error```
--- We get error from Random Forest model = ```mod2_error```
--- We get error from combined model = ```combinedMod_error```
-
-- Use Combined Model to predict Classe from test data
+- Use Random Forest Model to predict Classe from test data, as its accuracy (0.98) is greater than decision tree model (0.70)
 ```{r Test_Results}
-predict(combinedFit, predDF)
+predict(mod2, newdata=test)
 ```
