@@ -1,0 +1,117 @@
+---
+title: "Prediction Assignment"
+author: "KKher"
+date: "8/29/2020"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, error = FALSE, warning = FALSE)
+```
+
+## Objective
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with.
+
+In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website [here](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har) (see the section on the Weight Lifting Exercise Dataset).
+
+## Data
+
+The data for this project come from this [source](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har)
+- The training data for this project are available [here](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv)
+- The test data are available [here](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv)
+
+```{r data_lib}
+# import libraries
+library(plotly);library(caret);
+
+# import data
+train <- read.csv("pml-training.csv")
+test <- read.csv("pml-testing.csv")
+```
+
+## Data Wrangling
+
+First we need to clean up our dataset and only use column with data.
+- Remove unwanted columns
+- Handle NAs
+```{r cleanup}
+# check number of NA per coulmn
+na_count <- colSums(is.na(train))
+table(na_count)
+
+# since we have almost 67 columns with empty values, we will drop those
+# first get their names
+na_cols <- names(na_count[na_count>0])
+train_noNA <- train[, !(names(train) %in% na_cols)]
+
+# also the first 7 columns are unneeded
+train_noNA <- train_noNA[,-c(1:7)]
+
+# do the same on test dataset
+na_count <- colSums(is.na(test))
+na_cols <- names(na_count[na_count>0])
+test_noNA <- test[, !(names(test) %in% na_cols)]
+test_noNA <- test_noNA[,-c(1:7)]
+
+# examine our objective column
+plot_ly(x = train_noNA$classe, type = "histogram", histnorm = "probability") %>%
+  layout(title = "Propotion of Classe variable in Train dataset",
+         xaxis= list(title = "Classe"), yaxis= list(title = "Probability") )
+```
+
+## Prediction Technique
+
+I'll use combined predictors technique to get best results with least errors.
+Two main techniques will be Random Forest & MultiNomial modeling.
+
+- First Model: Tree Classification
+``` {r algorithm1}
+library(rpart)
+# create training, validation
+inTrain <- createDataPartition(train_noNA$classe, p = 0.70, list = FALSE)
+validation <- train_noNA[-inTrain, ]
+training <- train_noNA[inTrain, ]
+
+# build model & plot result
+mod1 <- rpart(classe ~ ., data = training, method = "class")
+rpart.plot(modelTree, main="Classification Tree", extra=102, under=TRUE, faclen=0)
+
+# use model#1 to calculate prediction
+pred1 <- predict(mod1, validation)
+```
+
+- Second Model: Random Forest
+```{r algorithm2}
+# build model & plot result
+library(randomForest)
+mod2<- randomForest(classe ~ ., training, ntree=100)
+plot(mod2, log="y")
+# use model#2 to calculate prediction
+pred2 <- predict(mod2, validation)
+```
+
+- Plot output of two models
+```{r 2modelsPlot}
+qplot(pred1, pred2,colour=classe, data=validation)
+```
+
+- Combine Models above and check their errors
+```{r combineMethods}
+predDF <- data.frame(pred1, pred2, classe=validation$classe)
+combinedFit <- train(classe~., method="gam", data=predDF)
+combinedPred <- predict(combinedFit, predDF)
+
+# checking errors
+mod1_error <- sqrt(sum((pred1-validation$classe)^2))
+mod2_error <- sqrt(sum((pred2-validation$classe)^2))
+combinedMod_error <- sqrt(sum((combinedPred-validation$classe)^2))
+```
+
+-- We get error from Tree classification model = ```mod1_error```
+-- We get error from Random Forest model = ```mod2_error```
+-- We get error from combined model = ```combinedMod_error```
+
+- Use Combined Model to predict Classe from test data
+```{r Test_Results}
+predict(combinedFit, predDF)
+```
