@@ -12,7 +12,9 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, error = FALSE, warning = FAL
 
 The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with.
 
-In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website [here](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har) (see the section on the Weight Lifting Exercise Dataset).
+> We propose a dataset with 5 classes (sitting-down, standing-up, standing, walking, and sitting) collected on 8 hours of activities of 4 healthy subjects.
+
+Goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website [here](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har) (see the section on the Weight Lifting Exercise Dataset).
 
 ## Data
 
@@ -52,7 +54,7 @@ plot_ly(x = train$classe, type = "histogram", histnorm = "probability") %>%
 
 ## Prediction Technique
 
-Two main techniques will be Random Forest & MultiNomial modeling.
+Two main techniques will be Random Forest & Decision Tree modeling.
 
 - First Model: Decision Tree Classification
 ``` {r algorithm1}
